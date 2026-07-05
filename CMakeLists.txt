@@ -35,7 +35,7 @@ set(RESOURCES
     assets/resources.qrc
 )
 
-add_executable(${PROJECT_NAME} WIN32 ${SOURCES} ${HEADERS} ${RESOURCES})
+add_executable(${PROJECT_NAME} WIN32 ${SOURCES} ${HEADERS} ${RESOURCES} assets/app.rc)
 
 target_include_directories(${PROJECT_NAME} PRIVATE src ${CURL_INCLUDE_DIRS} ${WEBVIEW2_INCLUDE})
 
