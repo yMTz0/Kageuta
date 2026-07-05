@@ -1,0 +1,22 @@
+# Build
+build/
+*.obj
+*.o
+*.a
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+
+# Release binaries (keep source only)
+release/
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db
+.DS_Store
