@@ -43,6 +43,10 @@ private slots:
     void onSeek(int value);
     void onBackFromPlayer();
     void onOpenInBrowser();
+    void onToggleFullscreen();
+
+protected:
+    void keyPressEvent(QKeyEvent* event) override;
 
 private:
     void setupUi();
@@ -88,6 +92,7 @@ private:
     QLabel* m_durationLabel;
     QPushButton* m_btnPlay;
     QPushButton* m_btnMute;
+    QPushButton* m_btnFullscreen;
     QLabel* m_searchTitle;
 
     Scraper* m_scraper;

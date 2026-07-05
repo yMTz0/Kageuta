@@ -16,6 +16,7 @@
 #include <QRegularExpression>
 #include <QFile>
 #include <QTextStream>
+#include <QKeyEvent>
 
 static void appLog(const QString& msg) {
     QFile f(QCoreApplication::applicationDirPath() + "/debug.log");
@@ -266,7 +267,8 @@ QWidget* MainWindow::createPlayerPage() {
     playerLayout->setContentsMargins(0, 0, 0, 0);
 
     m_player->videoWidget()->setStyleSheet("background-color: #000; border-radius: 8px;");
-    m_player->videoWidget()->setMinimumHeight(400);
+    m_player->videoWidget()->setMinimumHeight(450);
+    m_player->videoWidget()->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     playerLayout->addWidget(m_player->videoWidget(), 1);
 
     m_webview = new WebView2Widget(playerArea);
@@ -340,6 +342,12 @@ QWidget* MainWindow::createPlayerPage() {
     m_volumeSlider->setFixedWidth(100);
     connect(m_volumeSlider, &QSlider::sliderMoved, this, &MainWindow::onVolumeChanged);
     buttonsLayout->addWidget(m_volumeSlider);
+
+    m_btnFullscreen = new QPushButton("\u26f6");
+    m_btnFullscreen->setObjectName("controlButton");
+    m_btnFullscreen->setFixedSize(36, 36);
+    connect(m_btnFullscreen, &QPushButton::clicked, this, &MainWindow::onToggleFullscreen);
+    buttonsLayout->addWidget(m_btnFullscreen);
 
     controlsLayout->addLayout(buttonsLayout);
     playerLayout->addWidget(controlsWidget);
@@ -480,11 +488,18 @@ void MainWindow::downloadImage(const QString& url, QLabel* label, QSize size) {
         return;
     }
 
-    QNetworkRequest request{QUrl(url)};
+    QUrl qurl(url);
+    if (!qurl.isValid()) return;
+
+    QNetworkRequest request(qurl);
+    request.setRawHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+    request.setRawHeader("Referer", "https://animesonlinecc.to/");
     QNetworkReply* reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, label, size, url]() {
-        if (reply->error() == QNetworkReply::NoError) {
-            QByteArray data = reply->readAll();
+        bool ok = (reply->error() == QNetworkReply::NoError);
+        QByteArray data;
+        if (ok) {
+            data = reply->readAll();
             QImage img;
             img.loadFromData(data);
             if (!img.isNull()) {
@@ -759,6 +774,25 @@ void MainWindow::onBackFromPlayer() {
 void MainWindow::onOpenInBrowser() {
     if (m_currentEpisode.url.isEmpty()) return;
     QDesktopServices::openUrl(QUrl(m_currentEpisode.url));
+}
+
+void MainWindow::onToggleFullscreen() {
+    if (isFullScreen()) {
+        showNormal();
+        m_btnFullscreen->setText("\u26f6");
+    } else {
+        showFullScreen();
+        m_btnFullscreen->setText("\u26f6");
+    }
+}
+
+void MainWindow::keyPressEvent(QKeyEvent* event) {
+    if (event->key() == Qt::Key_Escape && isFullScreen()) {
+        showNormal();
+        m_btnFullscreen->setText("\u26f6");
+        return;
+    }
+    QMainWindow::keyPressEvent(event);
 }
 
 void MainWindow::showSearchResults(const QList<Anime>& results) {
