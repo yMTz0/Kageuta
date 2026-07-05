@@ -17,7 +17,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setMinimumSize(1200, 750);
     resize(1400, 850);
 
-    setWindowIcon(QIcon(":/assets/icon.png"));
+    setWindowIcon(QIcon(":/icon.png"));
 
     m_scraper = new Scraper(this);
     m_player = new Player(this);
@@ -59,6 +59,11 @@ QWidget* MainWindow::createSidebar() {
 
     QHBoxLayout* logoLayout = new QHBoxLayout();
     logoLayout->setSpacing(8);
+
+    QLabel* logoIcon = new QLabel();
+    logoIcon->setPixmap(QPixmap(":/icon.png").scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logoIcon->setFixedSize(32, 32);
+    logoLayout->addWidget(logoIcon);
 
     QLabel* logoText = new QLabel("KAGEUTA");
     logoText->setStyleSheet(QString("color: %1; font-size: 16px; font-weight: bold; letter-spacing: 3px;").arg(Styles::ACCENT));
@@ -451,14 +456,18 @@ void MainWindow::downloadImage(const QString& url, QLabel* label, QSize size) {
         return;
     }
 
-    QNetworkReply* reply = m_networkManager->get(QNetworkRequest(QUrl(url)));
+    QNetworkRequest request{QUrl(url)};
+    QNetworkReply* reply = m_networkManager->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, label, size, url]() {
         if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
             QImage img;
-            img.loadFromData(reply->readAll());
-            QPixmap pixmap = QPixmap::fromImage(img).scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-            m_imageCache[url] = pixmap;
-            label->setPixmap(pixmap);
+            img.loadFromData(data);
+            if (!img.isNull()) {
+                QPixmap pixmap = QPixmap::fromImage(img).scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+                m_imageCache[url] = pixmap;
+                label->setPixmap(pixmap);
+            }
         }
         reply->deleteLater();
     });

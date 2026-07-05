@@ -1,5 +1,6 @@
 #include <QApplication>
 #include <QIcon>
+#include <exception>
 #include "mainwindow.h"
 #include "styles.h"
 

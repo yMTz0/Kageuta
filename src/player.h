@@ -34,7 +34,7 @@ signals:
     void mediaStatusChanged(QMediaPlayer::MediaStatus status);
 
 private:
-    QMediaPlayer* m_player;
+    QMediaPlayer* m_player = nullptr;
     QAudioOutput* m_audioOutput;
     QVideoWidget* m_videoWidget;
 };
