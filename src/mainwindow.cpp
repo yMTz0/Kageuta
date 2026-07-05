@@ -431,7 +431,7 @@ QWidget* MainWindow::createAnimeCard(const Anime& anime) {
     }
 
     if (!anime.thumbnail.isEmpty()) {
-        downloadImage(anime.thumbnail, imageLabel, QSize(164, 220));
+        downloadImage(anime.thumbnail, imageLabel, QSize(164, 220), anime.title);
     }
 
     connect(card, &ClickableFrame::clicked, this, [this, anime]() { onAnimeClicked(anime); });
@@ -474,7 +474,7 @@ QWidget* MainWindow::createEpisodeCard(const Episode& episode) {
     layout->addLayout(infoLayout, 1);
 
     if (!episode.thumbnail.isEmpty()) {
-        downloadImage(episode.thumbnail, imageLabel, QSize(120, 68));
+        downloadImage(episode.thumbnail, imageLabel, QSize(120, 68), episode.title);
     }
 
     connect(card, &ClickableFrame::clicked, this, [this, episode]() { onEpisodeClicked(episode); });
@@ -482,20 +482,27 @@ QWidget* MainWindow::createEpisodeCard(const Episode& episode) {
     return card;
 }
 
-void MainWindow::downloadImage(const QString& url, QLabel* label, QSize size) {
+void MainWindow::downloadImage(const QString& url, QLabel* label, QSize size, const QString& title) {
     if (m_imageCache.contains(url)) {
         label->setPixmap(m_imageCache[url].scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation));
         return;
     }
 
     QUrl qurl(url);
-    if (!qurl.isValid()) return;
+    if (!qurl.isValid()) {
+        if (!title.isEmpty()) {
+            m_scraper->fetchJikanImage(title, [this, label, size, title](const QString& jikanUrl) {
+                if (!jikanUrl.isEmpty()) downloadImage(jikanUrl, label, size);
+            });
+        }
+        return;
+    }
 
     QNetworkRequest request(qurl);
     request.setRawHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-    request.setRawHeader("Referer", "https://animesonlinecc.to/");
+    request.setRawHeader("Referer", "https://anikyuu.to/");
     QNetworkReply* reply = m_networkManager->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, label, size, url]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, label, size, url, title]() {
         bool ok = (reply->error() == QNetworkReply::NoError);
         QByteArray data;
         if (ok) {
@@ -506,9 +513,17 @@ void MainWindow::downloadImage(const QString& url, QLabel* label, QSize size) {
                 QPixmap pixmap = QPixmap::fromImage(img).scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
                 m_imageCache[url] = pixmap;
                 label->setPixmap(pixmap);
+                reply->deleteLater();
+                return;
             }
         }
         reply->deleteLater();
+        if (!title.isEmpty()) {
+            appLog("Image failed, trying Jikan for: " + title);
+            m_scraper->fetchJikanImage(title, [this, label, size, title](const QString& jikanUrl) {
+                if (!jikanUrl.isEmpty()) downloadImage(jikanUrl, label, size);
+            });
+        }
     });
 }
 
@@ -612,7 +627,7 @@ void MainWindow::onAnimeClicked(const Anime& anime) {
     m_animeDetailInfo->setText("Fonte: " + anime.url);
 
     if (!anime.thumbnail.isEmpty()) {
-        downloadImage(anime.thumbnail, m_animeCover, QSize(200, 290));
+        downloadImage(anime.thumbnail, m_animeCover, QSize(200, 290), anime.title);
     }
 
     m_scraper->fetchAnimeEpisodes(anime.url, [this](const QList<Episode>& episodes) {

@@ -69,7 +69,7 @@ private:
     QWidget* createAnimeCard(const Anime& anime);
     QWidget* createEpisodeCard(const Episode& episode);
 
-    void downloadImage(const QString& url, QLabel* label, QSize size);
+    void downloadImage(const QString& url, QLabel* label, QSize size, const QString& title = QString());
 
     QStackedWidget* m_stacked;
     QLineEdit* m_searchInput;

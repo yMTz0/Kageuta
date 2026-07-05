@@ -5,6 +5,9 @@
 #include <QCoreApplication>
 #include <QFile>
 #include <QTextStream>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 static void scraperLog(const QString& msg) {
     QFile f(QCoreApplication::applicationDirPath() + "/debug.log");
@@ -19,15 +22,10 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::stri
     return size * nmemb;
 }
 
-static QString fixUrl(const QString& url, const char* base) {
-    if (url.isEmpty()) return url;
-    if (url.startsWith("http")) return url;
-    return QString(base) + "/" + url;
-}
-
 static QString fullResUrl(const QString& url) {
     QString u = url;
-    u.remove(QRegularExpression(QStringLiteral("-\\d+x\\d+(?=\\.\\w{3,4}$)")));
+    u.remove(QRegularExpression(QStringLiteral("\\?resize=\\d+,\\d+")));
+    u.remove(QRegularExpression(QStringLiteral("\\?w=\\d+&h=\\d+")));
     return u;
 }
 
@@ -53,69 +51,30 @@ QString Scraper::fetchUrl(const QString& url) {
     return QString::fromStdString(response);
 }
 
-QString Scraper::resolveBloggerUrl(const QString& bloggerUrl) {
-    QString html = fetchUrl(bloggerUrl);
-
-    QRegularExpression googlevideoRe(QStringLiteral("\"(https?://[^\"]*\\.googlevideo\\.com/[^\"]*)\""));
-    QRegularExpressionMatch match = googlevideoRe.match(html);
-    if (match.hasMatch()) {
-        return match.captured(1);
-    }
-
-    QRegularExpression urlRe(QStringLiteral("\"url\"\\s*:\\s*\"(https?://[^\"]*)\""));
-    match = urlRe.match(html);
-    if (match.hasMatch()) {
-        QString url = match.captured(1);
-        url.replace(QStringLiteral("\\u003d"), QStringLiteral("="));
-        url.replace(QStringLiteral("\\u0026"), QStringLiteral("&"));
-        return url;
-    }
-
-    QRegularExpression sourceRe(QStringLiteral("<source[^>]*src=\"([^\"]*)\""));
-    match = sourceRe.match(html);
-    if (match.hasMatch()) {
-        return match.captured(1);
-    }
-
-    return bloggerUrl;
-}
-
 QList<Anime> Scraper::parseAnimeList(const QString& html) {
     QList<Anime> animes;
 
     QRegularExpression articleRe(
-        QStringLiteral("<article[^>]*class=\"[^\"]*item[^\"]*tvshows[^\"]*\"[^>]*>(.*?)</article>"),
+        QStringLiteral("<article\\s+class=\"bs\"[^>]*>.*?<a\\s+href=\"([^\"]*?)\"[^>]*>.*?<img\\s+src=\"([^\"]*?)\"[^>]*>.*?<div\\s+class=\"tt\">\\s*(.*?)\\s*<h2"),
         QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator it = articleRe.globalMatch(html);
 
-    QRegularExpression hrefRe(QStringLiteral("<a\\s+href=\"([^\"]*)\"[^>]*>"));
-    QRegularExpression titleRe(QStringLiteral("<h3[^>]*>\\s*<a[^>]*>(.*?)</a>"), QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpression imgRe(QStringLiteral("<img\\s+src=\"([^\"]*)\""));
-    QRegularExpression ratingRe(QStringLiteral("<span[^>]*class=\"icon-star2\"[^>]*></span>\\s*([\\d.]+)"));
-
     while (it.hasNext()) {
         QRegularExpressionMatch match = it.next();
-        QString block = match.captured(1);
+        Anime anime;
+        anime.url = match.captured(1);
+        anime.thumbnail = fullResUrl(match.captured(2));
+        QString titleBlock = match.captured(3).trimmed();
+        titleBlock.remove(QRegularExpression(QStringLiteral("<[^>]*>")));
+        titleBlock = titleBlock.trimmed();
+        anime.title = titleBlock;
 
-        QRegularExpressionMatch hrefMatch = hrefRe.match(block);
-        QRegularExpressionMatch titleMatch = titleRe.match(block);
-        QRegularExpressionMatch imgMatch = imgRe.match(block);
-        QRegularExpressionMatch ratingMatch = ratingRe.match(block);
-
-        if (hrefMatch.hasMatch()) {
-            Anime anime;
-            anime.url = fixUrl(hrefMatch.captured(1), BASE_URL);
-            anime.title = titleMatch.hasMatch() ? titleMatch.captured(1).trimmed() : "";
-            anime.thumbnail = fullResUrl(fixUrl(imgMatch.captured(1), BASE_URL));
-            anime.rating = ratingMatch.hasMatch() ? ratingMatch.captured(1) : "";
-
-            if (!anime.title.isEmpty()) {
-                bool dup = false;
-                for (const auto& a : animes) {
-                    if (a.url == anime.url) { dup = true; break; }
-                }
-                if (!dup) animes.append(anime);
+        if (!anime.title.isEmpty() && !anime.url.isEmpty()) {
+            bool dup = false;
+            for (const auto& a : animes) {
+                if (a.url == anime.url) { dup = true; break; }
             }
+            if (!dup) animes.append(anime);
         }
     }
     return animes;
@@ -125,30 +84,34 @@ QList<Episode> Scraper::parseEpisodeList(const QString& html) {
     QList<Episode> episodes;
 
     QRegularExpression articleRe(
-        QStringLiteral("<article[^>]*class=\"[^\"]*item[^\"]*episodes[^\"]*\"[^>]*>(.*?)</article>"),
+        QStringLiteral("<article\\s+class=\"bs\"[^>]*>.*?<a\\s+href=\"([^\"]*?)\"[^>]*title=\"([^\"]*?)\"[^>]*>.*?<span\\s+class=\"epx\">(.*?)</span>.*?<span\\s+class=\"sb\\s+(Sub|Dub)\"[^>]*>(.*?)</span>.*?<img\\s+src=\"([^\"]*?)\""),
         QRegularExpression::DotMatchesEverythingOption);
     QRegularExpressionMatchIterator it = articleRe.globalMatch(html);
 
-    QRegularExpression hrefRe(QStringLiteral("<a\\s+href=\"([^\"]*)\"[^>]*>"));
-    QRegularExpression titleRe(QStringLiteral("<h3[^>]*>\\s*<a[^>]*>(.*?)</a>"), QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpression imgRe(QStringLiteral("<img\\s+src=\"([^\"]*)\""));
-    QRegularExpression qualityRe(QStringLiteral("<span[^>]*class=\"quality\"[^>]*>(.*?)</span>"));
-
     while (it.hasNext()) {
         QRegularExpressionMatch match = it.next();
-        QString block = match.captured(1);
+        Episode ep;
+        ep.url = match.captured(1);
+        ep.title = match.captured(2);
+        QString quality = match.captured(4).trimmed();
+        ep.quality = quality.isEmpty() ? match.captured(5).trimmed() : quality;
+        ep.thumbnail = fullResUrl(match.captured(6));
+        if (!ep.title.isEmpty()) episodes.append(ep);
+    }
 
-        QRegularExpressionMatch hrefMatch = hrefRe.match(block);
-        QRegularExpressionMatch titleMatch = titleRe.match(block);
-        QRegularExpressionMatch imgMatch = imgRe.match(block);
-        QRegularExpressionMatch qualityMatch = qualityRe.match(block);
-
-        if (hrefMatch.hasMatch()) {
+    if (episodes.isEmpty()) {
+        QRegularExpression simpleRe(
+            QStringLiteral("<article\\s+class=\"bs\"[^>]*>.*?<a\\s+href=\"([^\"]*?)\"[^>]*>.*?<div\\s+class=\"tt\">\\s*(.*?)\\s*<h2\\s+itemprop=\"headline\">(.*?)</h2>.*?<img\\s+src=\"([^\"]*?)\""),
+            QRegularExpression::DotMatchesEverythingOption);
+        QRegularExpressionMatchIterator sit = simpleRe.globalMatch(html);
+        while (sit.hasNext()) {
+            QRegularExpressionMatch m = sit.next();
             Episode ep;
-            ep.url = fixUrl(hrefMatch.captured(1), BASE_URL);
-            ep.title = titleMatch.hasMatch() ? titleMatch.captured(1).trimmed() : "";
-            ep.thumbnail = fullResUrl(fixUrl(imgMatch.captured(1), BASE_URL));
-            ep.quality = qualityMatch.hasMatch() ? qualityMatch.captured(1).trimmed() : "";
+            ep.url = m.captured(1);
+            QString plainTitle = m.captured(2).trimmed();
+            plainTitle.remove(QRegularExpression(QStringLiteral("<[^>]*>")));
+            ep.title = plainTitle.isEmpty() ? m.captured(3).trimmed() : plainTitle;
+            ep.thumbnail = fullResUrl(m.captured(4));
             if (!ep.title.isEmpty()) episodes.append(ep);
         }
     }
@@ -158,36 +121,30 @@ QList<Episode> Scraper::parseEpisodeList(const QString& html) {
 QList<VideoSource> Scraper::parseVideoSources(const QString& html) {
     QList<VideoSource> sources;
 
-    QRegularExpression tabRe(
-        QStringLiteral("<a[^>]*class=\"options\"[^>]*href=\"#(option-\\d+)\"[^>]*>(.*?)</a>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatchIterator tabIt = tabRe.globalMatch(html);
-
-    while (tabIt.hasNext()) {
-        QRegularExpressionMatch tabMatch = tabIt.next();
-        QString optionId = tabMatch.captured(1);
-        QString label = tabMatch.captured(2).trimmed();
-        label.remove(QRegularExpression(QStringLiteral("<[^>]*>")));
-
-        QString pattern = optionId + QStringLiteral("[^>]*>.*?<iframe[^>]*src=\"([^\"]*)\"");
-        QRegularExpression iframeRe(pattern, QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch iframeMatch = iframeRe.match(html);
-
-        if (iframeMatch.hasMatch()) {
+    QRegularExpression iframeRe(
+        QStringLiteral("<iframe[^>]*src=\"([^\"]*?)\"[^>]*>"));
+    QRegularExpressionMatchIterator it = iframeRe.globalMatch(html);
+    int idx = 1;
+    while (it.hasNext()) {
+        QRegularExpressionMatch m = it.next();
+        QString src = m.captured(1);
+        if (src.contains("blogger.com") || src.contains("video.g") ||
+            src.contains("streamtape") || src.contains("sbplay") ||
+            src.contains("doodstream") || src.contains("mp4upload") ||
+            src.contains("embed") || src.contains("filemoon") ||
+            src.contains("vidhide") || src.contains("streamvid")) {
             VideoSource source;
-            source.label = label;
-            source.iframeUrl = iframeMatch.captured(1);
+            source.label = QString("Fonte %1").arg(idx++);
+            source.iframeUrl = src;
             sources.append(source);
         }
     }
 
     if (sources.isEmpty()) {
-        QRegularExpression iframeRe(
-            QStringLiteral("<iframe[^>]*class=\"[^\"]*metaframe[^\"]*\"[^>]*src=\"([^\"]*)\""));
-        QRegularExpressionMatchIterator iframeIt = iframeRe.globalMatch(html);
-        int idx = 1;
-        while (iframeIt.hasNext()) {
-            QRegularExpressionMatch m = iframeIt.next();
+        QRegularExpression allIframeRe(QStringLiteral("<iframe[^>]*src=\"([^\"]*?)\""));
+        QRegularExpressionMatchIterator ait = allIframeRe.globalMatch(html);
+        while (ait.hasNext()) {
+            QRegularExpressionMatch m = ait.next();
             VideoSource source;
             source.label = QString("Fonte %1").arg(idx++);
             source.iframeUrl = m.captured(1);
@@ -225,8 +182,11 @@ void Scraper::fetchRecentEpisodes(std::function<void(QList<Episode>)> callback) 
 
 void Scraper::fetchAnimeEpisodes(const QString& url, std::function<void(QList<Episode>)> callback) {
     QThread* thread = QThread::create([this, url, callback]() {
+        scraperLog("fetchAnimeEpisodes: " + url);
         QString html = fetchUrl(url);
+        scraperLog("fetchAnimeEpisodes: html length = " + QString::number(html.length()));
         QList<Episode> episodes = parseEpisodeList(html);
+        scraperLog("fetchAnimeEpisodes: found " + QString::number(episodes.size()) + " episodes");
         QMetaObject::invokeMethod(this, [callback, episodes]() { callback(episodes); });
     });
     thread->setParent(this);
@@ -245,8 +205,11 @@ void Scraper::searchAnime(const QString& query, std::function<void(QList<Anime>)
 
 void Scraper::fetchVideoSources(const QString& url, std::function<void(QList<VideoSource>)> callback) {
     QThread* thread = QThread::create([this, url, callback]() {
+        scraperLog("fetchVideoSources: " + url);
         QString html = fetchUrl(url);
+        scraperLog("fetchVideoSources: html length = " + QString::number(html.length()));
         QList<VideoSource> sources = parseVideoSources(html);
+        scraperLog("fetchVideoSources: found " + QString::number(sources.size()) + " sources");
         QMetaObject::invokeMethod(this, [callback, sources]() { callback(sources); });
     });
     thread->setParent(this);
@@ -256,7 +219,7 @@ void Scraper::fetchVideoSources(const QString& url, std::function<void(QList<Vid
 void Scraper::fetchAllAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
         scraperLog("fetchAllAnimes: fetching...");
-        QString html = fetchUrl(QString(BASE_URL) + "/anime/");
+        QString html = fetchUrl(QString(BASE_URL) + "/anime");
         scraperLog("fetchAllAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
         scraperLog("fetchAllAnimes: found " + QString::number(animes.size()) + " animes");
@@ -269,7 +232,7 @@ void Scraper::fetchAllAnimes(std::function<void(QList<Anime>)> callback) {
 void Scraper::fetchDubbedAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
         scraperLog("fetchDubbedAnimes: fetching...");
-        QString html = fetchUrl(QString(BASE_URL) + "/genero/dublado/");
+        QString html = fetchUrl(QString(BASE_URL) + "/anime/?sub=dub");
         scraperLog("fetchDubbedAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
         scraperLog("fetchDubbedAnimes: found " + QString::number(animes.size()) + " animes");
@@ -282,11 +245,38 @@ void Scraper::fetchDubbedAnimes(std::function<void(QList<Anime>)> callback) {
 void Scraper::fetchSubtitledAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
         scraperLog("fetchSubtitledAnimes: fetching...");
-        QString html = fetchUrl(QString(BASE_URL) + "/genero/legendado/");
+        QString html = fetchUrl(QString(BASE_URL) + "/anime/?sub=sub");
         scraperLog("fetchSubtitledAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
         scraperLog("fetchSubtitledAnimes: found " + QString::number(animes.size()) + " animes");
         QMetaObject::invokeMethod(this, [callback, animes]() { callback(animes); });
+    });
+    thread->setParent(this);
+    thread->start();
+}
+
+void Scraper::fetchJikanImage(const QString& title, std::function<void(const QString&)> callback) {
+    QThread* thread = QThread::create([this, title, callback]() {
+        QString cleanTitle = title;
+        cleanTitle.remove(QRegularExpression(QStringLiteral("\\s*(Dublado|Legendado|\\d+p|720p|1080p)\\s*")));
+        QString searchUrl = "https://api.jikan.moe/v4/anime?q=" + QUrl::toPercentEncoding(cleanTitle) + "&limit=1";
+        scraperLog("fetchJikanImage: " + searchUrl);
+        QString json = fetchUrl(searchUrl);
+        QString imageUrl;
+        QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+        if (doc.isObject()) {
+            QJsonObject root = doc.object();
+            QJsonArray data = root["data"].toArray();
+            if (!data.isEmpty()) {
+                QJsonObject anime = data[0].toObject();
+                QJsonObject images = anime["images"].toObject();
+                QJsonObject jpg = images["jpg"].toObject();
+                imageUrl = jpg["large_image_url"].toString();
+                if (imageUrl.isEmpty()) imageUrl = jpg["image_url"].toString();
+            }
+        }
+        scraperLog("fetchJikanImage: result = " + imageUrl.left(100));
+        QMetaObject::invokeMethod(this, [callback, imageUrl]() { callback(imageUrl); });
     });
     thread->setParent(this);
     thread->start();
