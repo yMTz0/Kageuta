@@ -30,6 +30,33 @@ QString Scraper::fetchUrl(const QString& url) {
     return QString::fromStdString(response);
 }
 
+QString Scraper::resolveBloggerUrl(const QString& bloggerUrl) {
+    QString html = fetchUrl(bloggerUrl);
+
+    QRegularExpression googlevideoRe(QStringLiteral("\"(https?://[^\"]*\\.googlevideo\\.com/[^\"]*)\""));
+    QRegularExpressionMatch match = googlevideoRe.match(html);
+    if (match.hasMatch()) {
+        return match.captured(1);
+    }
+
+    QRegularExpression urlRe(QStringLiteral("\"url\"\\s*:\\s*\"(https?://[^\"]*)\""));
+    match = urlRe.match(html);
+    if (match.hasMatch()) {
+        QString url = match.captured(1);
+        url.replace(QStringLiteral("\\u003d"), QStringLiteral("="));
+        url.replace(QStringLiteral("\\u0026"), QStringLiteral("&"));
+        return url;
+    }
+
+    QRegularExpression sourceRe(QStringLiteral("<source[^>]*src=\"([^\"]*)\""));
+    match = sourceRe.match(html);
+    if (match.hasMatch()) {
+        return match.captured(1);
+    }
+
+    return bloggerUrl;
+}
+
 QList<Anime> Scraper::parseAnimeList(const QString& html) {
     QList<Anime> animes;
 

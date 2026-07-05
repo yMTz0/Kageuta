@@ -626,7 +626,14 @@ void MainWindow::onSourceChanged(int index) {
     if (index < 0 || index >= m_currentSources.size()) return;
 
     const VideoSource& source = m_currentSources[index];
-    m_player->play(source.iframeUrl);
+    QString url = source.iframeUrl;
+
+    if (url.contains("blogger.com") || url.contains(".googlevideo.com") == false) {
+        QDesktopServices::openUrl(QUrl(url));
+        return;
+    }
+
+    m_player->play(url);
 }
 
 void MainWindow::onPlayPause() {

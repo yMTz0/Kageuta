@@ -45,6 +45,7 @@ private:
     static constexpr const char* USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     QString fetchUrl(const QString& url);
+    QString resolveBloggerUrl(const QString& bloggerUrl);
     QList<Anime> parseAnimeList(const QString& html);
     QList<Episode> parseEpisodeList(const QString& html);
     QList<VideoSource> parseVideoSources(const QString& html);
