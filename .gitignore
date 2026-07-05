@@ -8,9 +8,12 @@ CMakeFiles/
 Makefile
 cmake_install.cmake
 
-# Release binaries (keep source only)
+# Release binaries
 release/
 *.exe
+
+# WebView2 SDK (downloaded separately)
+webview2/
 
 # IDE
 .vscode/
@@ -20,3 +23,6 @@ release/
 # OS
 Thumbs.db
 .DS_Store
+
+# ZIP releases
+*.zip

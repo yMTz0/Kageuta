@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "styles.h"
 #include "clickableframe.h"
+#include "webview2widget.h"
 
 #include <QApplication>
 #include <QDesktopServices>
@@ -250,6 +251,12 @@ QWidget* MainWindow::createPlayerPage() {
     m_player->videoWidget()->setStyleSheet("background-color: #000; border-radius: 8px;");
     m_player->videoWidget()->setMinimumHeight(400);
     playerLayout->addWidget(m_player->videoWidget(), 1);
+
+    m_webview = new WebView2Widget(playerArea);
+    m_webview->setStyleSheet("background-color: #000; border-radius: 8px;");
+    m_webview->setMinimumHeight(400);
+    m_webview->hide();
+    playerLayout->addWidget(m_webview, 1);
 
     QWidget* controlsWidget = new QWidget();
     controlsWidget->setStyleSheet(QString("background-color: %1; border-radius: 0 0 8px 8px;").arg(Styles::BG_SECONDARY));
@@ -628,12 +635,19 @@ void MainWindow::onSourceChanged(int index) {
     const VideoSource& source = m_currentSources[index];
     QString url = source.iframeUrl;
 
-    if (url.contains("blogger.com") || url.contains(".googlevideo.com") == false) {
-        QDesktopServices::openUrl(QUrl(url));
-        return;
-    }
+    bool isIframe = url.contains("blogger.com") || url.contains("video.g") ||
+                    url.contains("streamtape") || url.contains("sbplay") ||
+                    url.contains("embed") || url.contains("iframe");
 
-    m_player->play(url);
+    if (isIframe) {
+        m_player->videoWidget()->hide();
+        m_webview->show();
+        m_webview->navigate(url);
+    } else {
+        m_webview->hide();
+        m_player->videoWidget()->show();
+        m_player->play(url);
+    }
 }
 
 void MainWindow::onPlayPause() {

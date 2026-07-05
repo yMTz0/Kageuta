@@ -20,6 +20,8 @@
 #include "scraper.h"
 #include "player.h"
 
+class WebView2Widget;
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -96,4 +98,5 @@ private:
 
     QNetworkAccessManager* m_networkManager;
     QMap<QString, QPixmap> m_imageCache;
+    WebView2Widget* m_webview = nullptr;
 };
