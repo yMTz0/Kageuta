@@ -2,6 +2,17 @@
 #include <curl/curl.h>
 #include <QThread>
 #include <QRegularExpression>
+#include <QCoreApplication>
+#include <QFile>
+#include <QTextStream>
+
+static void scraperLog(const QString& msg) {
+    QFile f(QCoreApplication::applicationDirPath() + "/debug.log");
+    if (f.open(QIODevice::Append | QIODevice::Text)) {
+        QTextStream ts(&f);
+        ts << "[Scraper] " << msg << "\n";
+    }
+}
 
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* userp) {
     userp->append((char*)contents, size * nmemb);
@@ -182,8 +193,11 @@ QList<VideoSource> Scraper::parseVideoSources(const QString& html) {
 
 void Scraper::fetchHomeAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
+        scraperLog("fetchHomeAnimes: fetching...");
         QString html = fetchUrl(QString(BASE_URL));
+        scraperLog("fetchHomeAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
+        scraperLog("fetchHomeAnimes: found " + QString::number(animes.size()) + " animes");
         QMetaObject::invokeMethod(this, [callback, animes]() { callback(animes); });
     });
     thread->setParent(this);
@@ -192,8 +206,11 @@ void Scraper::fetchHomeAnimes(std::function<void(QList<Anime>)> callback) {
 
 void Scraper::fetchRecentEpisodes(std::function<void(QList<Episode>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
+        scraperLog("fetchRecentEpisodes: fetching...");
         QString html = fetchUrl(QString(BASE_URL));
+        scraperLog("fetchRecentEpisodes: html length = " + QString::number(html.length()));
         QList<Episode> episodes = parseEpisodeList(html);
+        scraperLog("fetchRecentEpisodes: found " + QString::number(episodes.size()) + " episodes");
         QMetaObject::invokeMethod(this, [callback, episodes]() { callback(episodes); });
     });
     thread->setParent(this);
@@ -232,8 +249,11 @@ void Scraper::fetchVideoSources(const QString& url, std::function<void(QList<Vid
 
 void Scraper::fetchAllAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
+        scraperLog("fetchAllAnimes: fetching...");
         QString html = fetchUrl(QString(BASE_URL) + "/anime/");
+        scraperLog("fetchAllAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
+        scraperLog("fetchAllAnimes: found " + QString::number(animes.size()) + " animes");
         QMetaObject::invokeMethod(this, [callback, animes]() { callback(animes); });
     });
     thread->setParent(this);
@@ -242,8 +262,11 @@ void Scraper::fetchAllAnimes(std::function<void(QList<Anime>)> callback) {
 
 void Scraper::fetchDubbedAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
+        scraperLog("fetchDubbedAnimes: fetching...");
         QString html = fetchUrl(QString(BASE_URL) + "/genero/dublado/");
+        scraperLog("fetchDubbedAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
+        scraperLog("fetchDubbedAnimes: found " + QString::number(animes.size()) + " animes");
         QMetaObject::invokeMethod(this, [callback, animes]() { callback(animes); });
     });
     thread->setParent(this);
@@ -252,8 +275,11 @@ void Scraper::fetchDubbedAnimes(std::function<void(QList<Anime>)> callback) {
 
 void Scraper::fetchSubtitledAnimes(std::function<void(QList<Anime>)> callback) {
     QThread* thread = QThread::create([this, callback]() {
+        scraperLog("fetchSubtitledAnimes: fetching...");
         QString html = fetchUrl(QString(BASE_URL) + "/genero/legendado/");
+        scraperLog("fetchSubtitledAnimes: html length = " + QString::number(html.length()));
         QList<Anime> animes = parseAnimeList(html);
+        scraperLog("fetchSubtitledAnimes: found " + QString::number(animes.size()) + " animes");
         QMetaObject::invokeMethod(this, [callback, animes]() { callback(animes); });
     });
     thread->setParent(this);

@@ -242,6 +242,11 @@ QWidget* MainWindow::createPlayerPage() {
     connect(m_sourceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onSourceChanged);
     headerLayout->addWidget(m_sourceCombo);
 
+    QPushButton* openBrowserBtn = new QPushButton("\U0001f517 Abrir no Navegador");
+    openBrowserBtn->setObjectName("actionButton");
+    connect(openBrowserBtn, &QPushButton::clicked, this, &MainWindow::onOpenInBrowser);
+    headerLayout->addWidget(openBrowserBtn);
+
     layout->addLayout(headerLayout);
 
     QWidget* playerArea = new QWidget();
@@ -540,29 +545,31 @@ void MainWindow::loadHome() {
 void MainWindow::updateHome(const QList<Episode>& episodes, const QList<Anime>& animes) {
     m_stacked->setCurrentIndex(0);
 
-    QLayoutItem* item;
-    while ((item = m_recentContainer->layout()->takeAt(0)) != nullptr) {
-        if (item->widget()) item->widget()->deleteLater();
-        delete item;
-    }
     if (!m_recentContainer->layout()) {
         m_recentContainer->setLayout(new QHBoxLayout());
         m_recentContainer->layout()->setSpacing(12);
         m_recentContainer->layout()->setAlignment(Qt::AlignLeft);
     }
 
+    QLayoutItem* item;
+    while ((item = m_recentContainer->layout()->takeAt(0)) != nullptr) {
+        if (item->widget()) item->widget()->deleteLater();
+        delete item;
+    }
+
     for (const auto& ep : episodes) {
         m_recentContainer->layout()->addWidget(createEpisodeCard(ep));
+    }
+
+    if (!m_popularContainer->layout()) {
+        m_popularContainer->setLayout(new QHBoxLayout());
+        m_popularContainer->layout()->setSpacing(12);
+        m_popularContainer->layout()->setAlignment(Qt::AlignLeft);
     }
 
     while ((item = m_popularContainer->layout()->takeAt(0)) != nullptr) {
         if (item->widget()) item->widget()->deleteLater();
         delete item;
-    }
-    if (!m_popularContainer->layout()) {
-        m_popularContainer->setLayout(new QHBoxLayout());
-        m_popularContainer->layout()->setSpacing(12);
-        m_popularContainer->layout()->setAlignment(Qt::AlignLeft);
     }
 
     for (const auto& anime : animes) {
@@ -691,6 +698,11 @@ void MainWindow::onSeek(int value) {
 void MainWindow::onBackFromPlayer() {
     m_player->stop();
     m_stacked->setCurrentIndex(1);
+}
+
+void MainWindow::onOpenInBrowser() {
+    if (m_currentEpisode.url.isEmpty()) return;
+    QDesktopServices::openUrl(QUrl(m_currentEpisode.url));
 }
 
 void MainWindow::showSearchResults(const QList<Anime>& results) {

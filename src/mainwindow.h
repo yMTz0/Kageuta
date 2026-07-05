@@ -42,6 +42,7 @@ private slots:
     void onMuteToggle();
     void onSeek(int value);
     void onBackFromPlayer();
+    void onOpenInBrowser();
 
 private:
     void setupUi();
