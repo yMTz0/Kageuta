@@ -12,6 +12,18 @@
 #include <QSplitter>
 #include <QScrollBar>
 #include <QGraphicsDropShadowEffect>
+#include <QTimer>
+#include <QRegularExpression>
+#include <QFile>
+#include <QTextStream>
+
+static void appLog(const QString& msg) {
+    QFile f(QCoreApplication::applicationDirPath() + "/debug.log");
+    if (f.open(QIODevice::Append | QIODevice::Text)) {
+        QTextStream ts(&f);
+        ts << "[MainWindow] " << msg << "\n";
+    }
+}
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowTitle("Kageuta");
@@ -642,14 +654,58 @@ void MainWindow::onSourceChanged(int index) {
     const VideoSource& source = m_currentSources[index];
     QString url = source.iframeUrl;
 
-    bool isIframe = url.contains("blogger.com") || url.contains("video.g") ||
-                    url.contains("streamtape") || url.contains("sbplay") ||
-                    url.contains("embed") || url.contains("iframe");
+    bool isBlogger = url.contains("blogger.com") || url.contains("video.g");
 
-    if (isIframe) {
-        m_player->videoWidget()->hide();
+    if (isBlogger) {
         m_webview->show();
+        m_player->videoWidget()->hide();
         m_webview->navigate(url);
+
+        connect(m_webview, &WebView2Widget::scriptResultReady, this, [this](const QString& result) {
+            disconnect(m_webview, &WebView2Widget::scriptResultReady, this, nullptr);
+
+            QString videoUrl = result;
+            videoUrl.remove(QRegularExpression(QStringLiteral("^\"|\"$")));
+            videoUrl.replace(QStringLiteral("\\u003d"), QStringLiteral("="));
+            videoUrl.replace(QStringLiteral("\\u0026"), QStringLiteral("&"));
+
+            if (videoUrl.startsWith("http") && !videoUrl.contains("blogger.com")) {
+                appLog("Direct video URL found: " + videoUrl.left(100));
+                m_webview->hide();
+                m_player->videoWidget()->show();
+                m_player->play(videoUrl);
+            } else {
+                appLog("No direct URL, keeping WebView2");
+            }
+        });
+
+        QTimer::singleShot(4000, m_webview, [this]() {
+            m_webview->executeScript(QStringLiteral(
+                "(function(){"
+                "  var v = document.querySelector('video');"
+                "  if(v){"
+                "    var s = v.querySelector('source');"
+                "    if(s && s.src) return s.src;"
+                "    if(v.src) return v.src;"
+                "  }"
+                "  var iframes = document.querySelectorAll('iframe');"
+                "  for(var i=0;i<iframes.length;i++){"
+                "    try{"
+                "      var d = iframes[i].contentDocument;"
+                "      if(d){"
+                "        var v2 = d.querySelector('video');"
+                "        if(v2){"
+                "          var s2 = v2.querySelector('source');"
+                "          if(s2 && s2.src) return s2.src;"
+                "          if(v2.src) return v2.src;"
+                "        }"
+                "      }"
+                "    }catch(e){}"
+                "  }"
+                "  return '';"
+                "})()"
+            ));
+        });
     } else {
         m_webview->hide();
         m_player->videoWidget()->show();

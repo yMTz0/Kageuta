@@ -54,6 +54,31 @@ private:
     WebView2Widget* m_widget; ULONG m_ref;
 };
 
+class ScriptCompletedHandler : public ICoreWebView2ExecuteScriptCompletedHandler {
+public:
+    ScriptCompletedHandler(WebView2Widget* w) : m_widget(w), m_ref(1) {}
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++m_ref; }
+    ULONG STDMETHODCALLTYPE Release() override { ULONG r = --m_ref; if (r == 0) delete this; return r; }
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** ppv) override {
+        if (iid == IID_IUnknown || iid == IID_ICoreWebView2ExecuteScriptCompletedHandler) {
+            *ppv = static_cast<ICoreWebView2ExecuteScriptCompletedHandler*>(this);
+            AddRef(); return S_OK;
+        }
+        *ppv = nullptr; return E_NOINTERFACE;
+    }
+    HRESULT STDMETHODCALLTYPE Invoke(HRESULT errorCode, LPCWSTR resultObjectAsJson) override {
+        if (FAILED(errorCode) || !resultObjectAsJson) {
+            m_widget->onScriptResult(QString());
+            return S_OK;
+        }
+        QString result = QString::fromWCharArray(resultObjectAsJson);
+        m_widget->onScriptResult(result);
+        return S_OK;
+    }
+private:
+    WebView2Widget* m_widget; ULONG m_ref;
+};
+
 WebView2Widget::WebView2Widget(QWidget* parent) : QWidget(parent) {
     setAttribute(Qt::WA_NativeWindow);
 }
@@ -83,6 +108,12 @@ void WebView2Widget::navigate(const QString& url) {
     }
 }
 
+void WebView2Widget::executeScript(const QString& script) {
+    if (m_webview && m_initialized) {
+        m_webview->ExecuteScript(script.toStdWString().c_str(), new ScriptCompletedHandler(this));
+    }
+}
+
 void WebView2Widget::onEnvironmentCreated(ICoreWebView2Environment* env) {
     wvLog("Environment created");
     m_env = env;
@@ -103,6 +134,7 @@ void WebView2Widget::onControllerCreated(ICoreWebView2Controller* controller) {
     settings->put_IsScriptEnabled(TRUE);
     settings->put_AreDevToolsEnabled(FALSE);
     settings->put_AreDefaultContextMenusEnabled(FALSE);
+    settings->put_IsWebMessageEnabled(TRUE);
     settings->Release();
 
     m_controller->put_IsVisible(TRUE);
@@ -116,6 +148,11 @@ void WebView2Widget::onControllerCreated(ICoreWebView2Controller* controller) {
         wvLog("Navigating to: " + m_pendingUrl);
         m_webview->Navigate(m_pendingUrl.toStdWString().c_str());
     }
+}
+
+void WebView2Widget::onScriptResult(const QString& result) {
+    wvLog("Script result: " + result);
+    emit scriptResultReady(result);
 }
 
 void WebView2Widget::setVisible(bool visible) {

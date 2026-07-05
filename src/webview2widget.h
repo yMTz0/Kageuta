@@ -12,10 +12,15 @@ public:
     ~WebView2Widget();
 
     void navigate(const QString& url);
+    void executeScript(const QString& script);
     void setVisible(bool visible) override;
 
     void onEnvironmentCreated(ICoreWebView2Environment* env);
     void onControllerCreated(ICoreWebView2Controller* controller);
+    void onScriptResult(const QString& result);
+
+signals:
+    void scriptResultReady(const QString& result);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
