@@ -385,14 +385,14 @@ QWidget* MainWindow::createSearchPage() {
 QWidget* MainWindow::createAnimeCard(const Anime& anime) {
     ClickableFrame* card = new ClickableFrame();
     card->setObjectName("animeCard");
-    card->setFixedSize(160, 260);
+    card->setFixedSize(180, 280);
 
     QVBoxLayout* layout = new QVBoxLayout(card);
     layout->setContentsMargins(8, 8, 8, 8);
     layout->setSpacing(6);
 
     QLabel* imageLabel = new QLabel();
-    imageLabel->setFixedSize(144, 200);
+    imageLabel->setFixedSize(164, 220);
     imageLabel->setAlignment(Qt::AlignCenter);
     imageLabel->setStyleSheet(QString("border-radius: 6px; background-color: %1;").arg(Styles::BG_HOVER));
     imageLabel->setText("...");
@@ -401,7 +401,7 @@ QWidget* MainWindow::createAnimeCard(const Anime& anime) {
     QLabel* titleLabel = new QLabel(anime.title);
     titleLabel->setObjectName("animeTitle");
     titleLabel->setWordWrap(true);
-    titleLabel->setMaximumHeight(32);
+    titleLabel->setMaximumHeight(36);
     layout->addWidget(titleLabel);
 
     if (!anime.rating.isEmpty()) {
@@ -411,7 +411,7 @@ QWidget* MainWindow::createAnimeCard(const Anime& anime) {
     }
 
     if (!anime.thumbnail.isEmpty()) {
-        downloadImage(anime.thumbnail, imageLabel, QSize(144, 200));
+        downloadImage(anime.thumbnail, imageLabel, QSize(164, 220));
     }
 
     connect(card, &ClickableFrame::clicked, this, [this, anime]() { onAnimeClicked(anime); });
@@ -422,14 +422,14 @@ QWidget* MainWindow::createAnimeCard(const Anime& anime) {
 QWidget* MainWindow::createEpisodeCard(const Episode& episode) {
     ClickableFrame* card = new ClickableFrame();
     card->setObjectName("episodeCard");
-    card->setFixedHeight(70);
+    card->setFixedHeight(80);
 
     QHBoxLayout* layout = new QHBoxLayout(card);
     layout->setContentsMargins(10, 8, 10, 8);
     layout->setSpacing(12);
 
     QLabel* imageLabel = new QLabel();
-    imageLabel->setFixedSize(100, 56);
+    imageLabel->setFixedSize(120, 68);
     imageLabel->setAlignment(Qt::AlignCenter);
     imageLabel->setStyleSheet(QString("border-radius: 4px; background-color: %1;").arg(Styles::BG_HOVER));
     imageLabel->setText("\u25b6");
@@ -454,7 +454,7 @@ QWidget* MainWindow::createEpisodeCard(const Episode& episode) {
     layout->addLayout(infoLayout, 1);
 
     if (!episode.thumbnail.isEmpty()) {
-        downloadImage(episode.thumbnail, imageLabel, QSize(100, 56));
+        downloadImage(episode.thumbnail, imageLabel, QSize(120, 68));
     }
 
     connect(card, &ClickableFrame::clicked, this, [this, episode]() { onEpisodeClicked(episode); });

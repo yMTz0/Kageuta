@@ -19,6 +19,18 @@ static size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::stri
     return size * nmemb;
 }
 
+static QString fixUrl(const QString& url, const char* base) {
+    if (url.isEmpty()) return url;
+    if (url.startsWith("http")) return url;
+    return QString(base) + "/" + url;
+}
+
+static QString fullResUrl(const QString& url) {
+    QString u = url;
+    u.remove(QRegularExpression(QStringLiteral("-\\d+x\\d+(?=\\.\\w{3,4}$)")));
+    return u;
+}
+
 Scraper::Scraper(QObject* parent) : QObject(parent) {
     curl_global_init(CURL_GLOBAL_DEFAULT);
 }
@@ -92,12 +104,9 @@ QList<Anime> Scraper::parseAnimeList(const QString& html) {
 
         if (hrefMatch.hasMatch()) {
             Anime anime;
-            anime.url = hrefMatch.captured(1);
-            if (!anime.url.startsWith("http")) {
-                anime.url = QString(BASE_URL) + "/" + anime.url;
-            }
+            anime.url = fixUrl(hrefMatch.captured(1), BASE_URL);
             anime.title = titleMatch.hasMatch() ? titleMatch.captured(1).trimmed() : "";
-            anime.thumbnail = imgMatch.hasMatch() ? imgMatch.captured(1) : "";
+            anime.thumbnail = fullResUrl(fixUrl(imgMatch.captured(1), BASE_URL));
             anime.rating = ratingMatch.hasMatch() ? ratingMatch.captured(1) : "";
 
             if (!anime.title.isEmpty()) {
@@ -136,12 +145,9 @@ QList<Episode> Scraper::parseEpisodeList(const QString& html) {
 
         if (hrefMatch.hasMatch()) {
             Episode ep;
-            ep.url = hrefMatch.captured(1);
-            if (!ep.url.startsWith("http")) {
-                ep.url = QString(BASE_URL) + "/" + ep.url;
-            }
+            ep.url = fixUrl(hrefMatch.captured(1), BASE_URL);
             ep.title = titleMatch.hasMatch() ? titleMatch.captured(1).trimmed() : "";
-            ep.thumbnail = imgMatch.hasMatch() ? imgMatch.captured(1) : "";
+            ep.thumbnail = fullResUrl(fixUrl(imgMatch.captured(1), BASE_URL));
             ep.quality = qualityMatch.hasMatch() ? qualityMatch.captured(1).trimmed() : "";
             if (!ep.title.isEmpty()) episodes.append(ep);
         }
